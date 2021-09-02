@@ -231,6 +231,9 @@ impl<'a> ChannelInfo<'a> {
     pub fn compression(&self) -> ImageCompression {
         self.compression
     }
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
     pub fn raw_data(&self) -> &[u8] {
         self.raw_data.get_or_init(|| match self.compression {
             ImageCompression::Raw => self.data.clone(),
@@ -273,7 +276,7 @@ impl<'a> ChannelInfo<'a> {
             channel_data_width,
             channel_data_height,
             compression,
-            data: _data,
+            data,
             raw_data,
         } = self;
         let raw_data = raw_data.into_inner().unwrap();
@@ -287,7 +290,7 @@ impl<'a> ChannelInfo<'a> {
             channel_data_width,
             channel_data_height,
             compression,
-            data: Cow::Owned(Vec::new()),
+            data: Cow::Owned(data.into_owned()),
             raw_data: raw_data_cell,
         }
     }

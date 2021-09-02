@@ -59,7 +59,7 @@ impl<'a> ImageData<'a> {
                                     data = &follow[1..];
                                 }
                                 -128 => {
-                                    println!("may be error");
+                                    eprintln!("may be error");
                                 }
                             }
                         }
