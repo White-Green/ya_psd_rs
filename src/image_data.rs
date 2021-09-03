@@ -42,8 +42,7 @@ impl<'a> ImageData<'a> {
                 ImageCompression::RLE => {
                     let mut data = &self.data[self.height as usize * self.channels as usize * 2..];
                     for _ in 0..self.channels {
-                        let mut data_one_channel =
-                            Vec::with_capacity(self.width as usize * self.height as usize);
+                        let mut data_one_channel = Vec::with_capacity(self.width as usize * self.height as usize);
                         while data_one_channel.len() < self.width as usize * self.height as usize {
                             let (&len, follow) = data.split_first().unwrap();
                             match len as i8 {
@@ -63,10 +62,7 @@ impl<'a> ImageData<'a> {
                                 }
                             }
                         }
-                        assert_eq!(
-                            data_one_channel.len(),
-                            self.width as usize * self.height as usize
-                        );
+                        assert_eq!(data_one_channel.len(), self.width as usize * self.height as usize);
                         list.push(Cow::Owned(data_one_channel));
                     }
                 }
@@ -79,25 +75,10 @@ impl<'a> ImageData<'a> {
     }
     pub(crate) fn into_static(self) -> ImageData<'static> {
         let _ = self.raw_data();
-        let ImageData {
-            compression,
-            data,
-            raw_data,
-            width,
-            height,
-            channels,
-        } = self;
+        let ImageData { compression, data, raw_data, width, height, channels } = self;
         let raw_data = raw_data.into_inner().unwrap();
         let raw_data_cell = OnceCell::new();
-        raw_data_cell
-            .set(
-                raw_data
-                    .into_iter()
-                    .map(Cow::into_owned)
-                    .map(Cow::Owned)
-                    .collect(),
-            )
-            .unwrap();
+        raw_data_cell.set(raw_data.into_iter().map(Cow::into_owned).map(Cow::Owned).collect()).unwrap();
         ImageData {
             compression,
             data: Cow::Owned(data.into_owned()),
@@ -109,10 +90,7 @@ impl<'a> ImageData<'a> {
     }
 }
 
-pub(crate) fn parse_image_data<'a, 'b>(
-    input: &'a [u8],
-    header: &'b PsdHeader,
-) -> IResult<&'a [u8], ImageData<'a>> {
+pub(crate) fn parse_image_data<'a, 'b>(input: &'a [u8], header: &'b PsdHeader) -> IResult<&'a [u8], ImageData<'a>> {
     let (input, compression) = map_res(be_u16, ImageCompression::from_u16)(input)?;
     Ok((
         &input[..0],

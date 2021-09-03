@@ -20,10 +20,7 @@ impl<'a> ColorModeData<'a> {
     }
 }
 
-pub(crate) fn parse_color_mode<'a, 'b>(
-    input: &'a [u8],
-    header: &'b PsdHeader,
-) -> IResult<&'a [u8], ColorModeData<'a>> {
+pub(crate) fn parse_color_mode<'a, 'b>(input: &'a [u8], header: &'b PsdHeader) -> IResult<&'a [u8], ColorModeData<'a>> {
     let (input, len) = match header.color_mode() {
         ColorMode::Indexed => verify(be_u32, |len| *len == 768)(input)?,
         ColorMode::Duotone => be_u32(input)?,

@@ -36,13 +36,7 @@ impl<'a> Psd<'a> {
         &self.image_data
     }
     pub fn into_static(self) -> Psd<'static> {
-        let Psd {
-            header,
-            color_mode,
-            image_resources,
-            layer_information,
-            image_data,
-        } = self;
+        let Psd { header, color_mode, image_resources, layer_information, image_data } = self;
         Psd {
             header,
             color_mode: color_mode.into_static(),
@@ -59,11 +53,5 @@ pub fn parse_psd(input: &[u8]) -> Result<Psd, anyhow::Error> {
     let (input, image_resources) = parse_image_resources(input).unwrap();
     let (input, layer_information) = parse_layer_and_mask_information(input).unwrap();
     let (_, image_data) = parse_image_data(input, &header).unwrap();
-    Ok(Psd {
-        header,
-        color_mode,
-        image_resources,
-        layer_information,
-        image_data,
-    })
+    Ok(Psd { header, color_mode, image_resources, layer_information, image_data })
 }

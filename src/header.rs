@@ -71,15 +71,5 @@ pub(crate) fn parse_header(input: &[u8]) -> IResult<&[u8], PsdHeader> {
     let (input, width) = verify(be_u32, |width| (1..=30_000).contains(width))(input)?;
     let (input, depth) = verify(be_u16, |depth| [1, 8, 16, 32].contains(depth))(input)?;
     let (input, color_mode) = map_res(be_u16, ColorMode::from_u16)(input)?;
-    Ok((
-        input,
-        PsdHeader {
-            version: 1,
-            channels,
-            height,
-            width,
-            depth,
-            color_mode,
-        },
-    ))
+    Ok((input, PsdHeader { version: 1, channels, height, width, depth, color_mode }))
 }

@@ -22,11 +22,7 @@ impl<'a> ImageResourceBlock<'a> {
         &self.resource_data
     }
     fn into_static(self) -> ImageResourceBlock<'static> {
-        let ImageResourceBlock {
-            resource_id,
-            name,
-            resource_data,
-        } = self;
+        let ImageResourceBlock { resource_id, name, resource_data } = self;
         ImageResourceBlock {
             resource_id,
             name: Cow::Owned(name.into_owned()),
@@ -44,11 +40,7 @@ impl<'a> ImageResources<'a> {
     }
     pub(crate) fn into_static(self) -> ImageResources<'static> {
         let ImageResources(list) = self;
-        ImageResources(
-            list.into_iter()
-                .map(ImageResourceBlock::into_static)
-                .collect(),
-        )
+        ImageResources(list.into_iter().map(ImageResourceBlock::into_static).collect())
     }
 }
 

@@ -26,16 +26,9 @@ impl<'a> LayerAndMaskInformation<'a> {
         &self.additional_layer_information
     }
     pub(crate) fn into_static(self) -> LayerAndMaskInformation<'static> {
-        let LayerAndMaskInformation {
-            layer_info,
-            global_layer_mask_info,
-            additional_layer_information,
-        } = self;
+        let LayerAndMaskInformation { layer_info, global_layer_mask_info, additional_layer_information } = self;
         LayerAndMaskInformation {
-            layer_info: layer_info
-                .into_iter()
-                .map(LayerTreeNode::into_static)
-                .collect(),
+            layer_info: layer_info.into_iter().map(LayerTreeNode::into_static).collect(),
             global_layer_mask_info: Cow::Owned(global_layer_mask_info.into_owned()),
             additional_layer_information: Cow::Owned(additional_layer_information.into_owned()),
         }
@@ -49,11 +42,14 @@ pub struct LayerRecord<'a> {
     layer_bottom: i32,
     layer_right: i32,
     channel_info: Vec<ChannelInfo<'a>>,
+    transparency_mask: Option<ChannelInfo<'a>>,
+    user_supplied_layer_mask: Option<ChannelInfo<'a>>,
+    real_user_supplied_layer_mask: Option<ChannelInfo<'a>>,
     blend_mode: BlendMode,
     opacity: u8,
     clipping: Clipping,
-    flags: u8,
-    layer_mask_data: Cow<'a, [u8]>,
+    flags: LayerRecordFlags,
+    layer_mask_data: Option<LayerMaskData>,
     layer_blending_ranges_data: Cow<'a, [u8]>,
     layer_name: Cow<'a, [u8]>,
     additional_layer_info: Vec<AdditionalLayerInformation<'a>>,
@@ -75,6 +71,15 @@ impl<'a> LayerRecord<'a> {
     pub fn channel_info(&self) -> &[ChannelInfo<'a>] {
         &self.channel_info
     }
+    pub fn transparency_mask(&self) -> Option<&ChannelInfo<'a>> {
+        self.transparency_mask.as_ref()
+    }
+    pub fn user_supplied_layer_mask(&self) -> Option<&ChannelInfo<'a>> {
+        self.user_supplied_layer_mask.as_ref()
+    }
+    pub fn real_user_supplied_layer_mask(&self) -> Option<&ChannelInfo<'a>> {
+        self.real_user_supplied_layer_mask.as_ref()
+    }
     pub fn blend_mode(&self) -> BlendMode {
         self.blend_mode
     }
@@ -84,11 +89,11 @@ impl<'a> LayerRecord<'a> {
     pub fn clipping(&self) -> Clipping {
         self.clipping
     }
-    pub fn flags(&self) -> u8 {
+    pub fn flags(&self) -> LayerRecordFlags {
         self.flags
     }
-    pub fn layer_mask_data(&self) -> &[u8] {
-        &self.layer_mask_data
+    pub fn layer_mask_data(&self) -> Option<&LayerMaskData> {
+        self.layer_mask_data.as_ref()
     }
     pub fn layer_blending_ranges_data(&self) -> &[u8] {
         &self.layer_blending_ranges_data
@@ -106,6 +111,9 @@ impl<'a> LayerRecord<'a> {
             layer_bottom,
             layer_right,
             channel_info,
+            transparency_mask,
+            user_supplied_layer_mask,
+            real_user_supplied_layer_mask,
             blend_mode,
             opacity,
             clipping,
@@ -120,22 +128,105 @@ impl<'a> LayerRecord<'a> {
             layer_left,
             layer_bottom,
             layer_right,
-            channel_info: channel_info
-                .into_iter()
-                .map(ChannelInfo::into_static)
-                .collect(),
+            channel_info: channel_info.into_iter().map(ChannelInfo::into_static).collect(),
+            transparency_mask: transparency_mask.map(ChannelInfo::into_static),
+            user_supplied_layer_mask: user_supplied_layer_mask.map(ChannelInfo::into_static),
+            real_user_supplied_layer_mask: real_user_supplied_layer_mask.map(ChannelInfo::into_static),
             blend_mode,
             opacity,
             clipping,
             flags,
-            layer_mask_data: Cow::Owned(layer_mask_data.into_owned()),
+            layer_mask_data,
             layer_blending_ranges_data: Cow::Owned(layer_blending_ranges_data.into_owned()),
             layer_name: Cow::Owned(layer_name.into_owned()),
-            additional_layer_info: additional_layer_info
-                .into_iter()
-                .map(AdditionalLayerInformation::into_static)
-                .collect(),
+            additional_layer_info: additional_layer_info.into_iter().map(AdditionalLayerInformation::into_static).collect(),
         }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct LayerMaskData {
+    layer_mask_top: i32,
+    layer_mask_left: i32,
+    layer_mask_bottom: i32,
+    layer_mask_right: i32,
+    default_color: u8,
+    flags: LayerMaskFlags,
+    optional: Option<LayerMaskOptionalData>,
+}
+
+impl LayerMaskData {
+    pub fn layer_mask_top(&self) -> i32 {
+        self.layer_mask_top
+    }
+    pub fn layer_mask_left(&self) -> i32 {
+        self.layer_mask_left
+    }
+    pub fn layer_mask_bottom(&self) -> i32 {
+        self.layer_mask_bottom
+    }
+    pub fn layer_mask_right(&self) -> i32 {
+        self.layer_mask_right
+    }
+    pub fn default_color(&self) -> u8 {
+        self.default_color
+    }
+    pub fn flags(&self) -> LayerMaskFlags {
+        self.flags
+    }
+    pub fn optional(&self) -> Option<&LayerMaskOptionalData> {
+        self.optional.as_ref()
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct LayerMaskOptionalData {
+    real_flags: LayerMaskFlags,
+    real_user_mask_background: u8,
+    layer_mask_top: i32,
+    layer_mask_left: i32,
+    layer_mask_bottom: i32,
+    layer_mask_right: i32,
+}
+
+impl LayerMaskOptionalData {
+    pub fn real_flags(&self) -> LayerMaskFlags {
+        self.real_flags
+    }
+    pub fn real_user_mask_background(&self) -> u8 {
+        self.real_user_mask_background
+    }
+    pub fn layer_mask_top(&self) -> i32 {
+        self.layer_mask_top
+    }
+    pub fn layer_mask_left(&self) -> i32 {
+        self.layer_mask_left
+    }
+    pub fn layer_mask_bottom(&self) -> i32 {
+        self.layer_mask_bottom
+    }
+    pub fn layer_mask_right(&self) -> i32 {
+        self.layer_mask_right
+    }
+}
+
+bitflags::bitflags! {
+    pub struct LayerMaskFlags : u8 {
+        const POSITION_RELATIVE_TO_LAYER = 0b0000_0001;
+        const LAYER_MASK_DISABLED = 0b0000_0010;
+        const INVERT_LAYER_MASK_WHEN_BLENDING = 0b0000_0100;
+        const INDICATES_THAT_THE_USER_MASK_ACTUALLY_CAME_FROM_RENDERING_OTHER_DATA = 0b0000_1000;
+        const INDICATES_THAT_THE_USER_AND_OR_VECTOR_MASKS_HAVE_PARAMEWTERS_APPLIED_TO_THEM = 0b0001_0000;
+    }
+}
+
+bitflags::bitflags! {
+    pub struct LayerRecordFlags : u8 {
+        const TRANSPARENCY_PROTECTED = 0b0000_0001;
+        const VISIBLE = 0b0000_0010;
+        const OBSOLETE = 0b0000_0100;
+        const PHOTOSHOP_5_0_LATER = 0b0000_1000;
+        const PIXEL_DATA_IRRELEVANT_TO_APPEARANCE_OF_DOCUMENT = 0b0001_0000;
     }
 }
 
@@ -177,35 +268,15 @@ impl SectionDividerSubType {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum AdditionalLayerInformation<'a> {
-    SectionDivider {
-        section_divider_type: SectionDividerType,
-        key: Option<BlendMode>,
-        sub_type: Option<SectionDividerSubType>,
-    },
-    Unknown {
-        key: Cow<'a, [u8; 4]>,
-        data: Cow<'a, [u8]>,
-    },
+    SectionDivider { section_divider_type: SectionDividerType, key: Option<BlendMode>, sub_type: Option<SectionDividerSubType> },
+    Unknown { key: Cow<'a, [u8; 4]>, data: Cow<'a, [u8]> },
 }
 
 impl<'a> AdditionalLayerInformation<'a> {
     fn into_static(self) -> AdditionalLayerInformation<'static> {
         match self {
-            AdditionalLayerInformation::SectionDivider {
-                section_divider_type,
-                key,
-                sub_type,
-            } => AdditionalLayerInformation::SectionDivider {
-                section_divider_type,
-                key,
-                sub_type,
-            },
-            AdditionalLayerInformation::Unknown { key, data } => {
-                AdditionalLayerInformation::Unknown {
-                    key: Cow::Owned(key.into_owned()),
-                    data: Cow::Owned(data.into_owned()),
-                }
-            }
+            AdditionalLayerInformation::SectionDivider { section_divider_type, key, sub_type } => AdditionalLayerInformation::SectionDivider { section_divider_type, key, sub_type },
+            AdditionalLayerInformation::Unknown { key, data } => AdditionalLayerInformation::Unknown { key: Cow::Owned(key.into_owned()), data: Cow::Owned(data.into_owned()) },
         }
     }
 }
@@ -238,9 +309,7 @@ impl<'a> ChannelInfo<'a> {
         self.raw_data.get_or_init(|| match self.compression {
             ImageCompression::Raw => self.data.clone(),
             ImageCompression::RLE => {
-                let mut result = Vec::with_capacity(
-                    self.channel_data_width as usize * self.channel_data_height as usize,
-                );
+                let mut result = Vec::with_capacity(self.channel_data_width as usize * self.channel_data_height as usize);
                 let mut data = &self.data[self.channel_data_height as usize * 2..];
                 while !data.is_empty() {
                     let (&len, follow) = data.split_first().unwrap();
@@ -281,9 +350,7 @@ impl<'a> ChannelInfo<'a> {
         } = self;
         let raw_data = raw_data.into_inner().unwrap();
         let raw_data_cell = OnceCell::<Cow<'static, [u8]>>::new();
-        raw_data_cell
-            .set(Cow::Owned(raw_data.into_owned()))
-            .unwrap();
+        raw_data_cell.set(Cow::Owned(raw_data.into_owned())).unwrap();
         ChannelInfo {
             channel_id,
             channel_data_length,
@@ -418,10 +485,7 @@ impl<'a> ChannelImageData<'a> {
 #[derive(Debug, Eq, PartialEq)]
 pub enum LayerTreeNode<'a> {
     Leaf(LayerRecord<'a>),
-    Node {
-        folder: LayerRecord<'a>,
-        children: Vec<LayerTreeNode<'a>>,
-    },
+    Node { folder: LayerRecord<'a>, children: Vec<LayerTreeNode<'a>> },
 }
 
 impl<'a> LayerTreeNode<'a> {
@@ -430,18 +494,13 @@ impl<'a> LayerTreeNode<'a> {
             LayerTreeNode::Leaf(record) => LayerTreeNode::Leaf(record.into_static()),
             LayerTreeNode::Node { folder, children } => LayerTreeNode::Node {
                 folder: folder.into_static(),
-                children: children
-                    .into_iter()
-                    .map(LayerTreeNode::into_static)
-                    .collect(),
+                children: children.into_iter().map(LayerTreeNode::into_static).collect(),
             },
         }
     }
 }
 
-pub(crate) fn parse_layer_and_mask_information(
-    input: &[u8],
-) -> IResult<&[u8], LayerAndMaskInformation> {
+pub(crate) fn parse_layer_and_mask_information(input: &[u8]) -> IResult<&[u8], LayerAndMaskInformation> {
     let (input, len) = be_u32(input)?;
     let (follow, input) = take(len)(input)?;
     let (input, layer_info) = parse_layer_info(input)?;
@@ -467,10 +526,53 @@ fn parse_layer_info(input: &[u8]) -> IResult<&[u8], Vec<LayerTreeNode>> {
         layer_records.push(layer_record);
         input = i;
     }
-    let (input, _) = parse_channel_image_data(input, &mut layer_records)?;
-    assert!(input.is_empty());
+    let (_input, _) = parse_channel_image_data(input, &mut layer_records)?;
+    sort_channel_data(&mut layer_records);
     let layers = into_layer_tree(layer_records);
     Ok((follow, layers))
+}
+
+fn sort_channel_data(layer_records: &mut [LayerRecord]) {
+    for layer_record in layer_records {
+        let (mut channel_info, mut masks): (Vec<_>, Vec<_>) = layer_record.channel_info.drain(..).partition(|channel| channel.channel_id >= 0);
+        channel_info.sort_by_key(|ch| ch.channel_id);
+        let transparency_mask = masks.iter().position(|ch| ch.channel_id == -1).map(|index| masks.swap_remove(index));
+        let mut user_supplied_layer_mask = masks.iter().position(|ch| ch.channel_id == -2).map(|index| masks.swap_remove(index));
+        let mut real_user_supplied_layer_mask = masks.iter().position(|ch| ch.channel_id == -3).map(|index| masks.swap_remove(index));
+        channel_info.extend(masks);
+        if let Some(LayerMaskData {
+            layer_mask_top,
+            layer_mask_left,
+            layer_mask_bottom,
+            layer_mask_right,
+            optional,
+            ..
+        }) = &layer_record.layer_mask_data
+        {
+            if let Some(ChannelInfo { channel_data_width, channel_data_height, .. }) = &mut user_supplied_layer_mask {
+                *channel_data_width = (*layer_mask_right - *layer_mask_left) as u32;
+                *channel_data_height = (*layer_mask_bottom - *layer_mask_top) as u32;
+            } else {
+                eprintln!("may be error");
+            }
+            if let Some(LayerMaskOptionalData { layer_mask_top, layer_mask_left, layer_mask_bottom, layer_mask_right, .. }) = optional {
+                if let Some(ChannelInfo { channel_data_width, channel_data_height, .. }) = &mut real_user_supplied_layer_mask {
+                    *channel_data_width = (*layer_mask_right - *layer_mask_left) as u32;
+                    *channel_data_height = (*layer_mask_bottom - *layer_mask_top) as u32;
+                } else {
+                    eprintln!("may be error");
+                }
+            } else if real_user_supplied_layer_mask.is_some() {
+                eprintln!("may be error");
+            }
+        } else if user_supplied_layer_mask.is_some() {
+            eprintln!("may be error");
+        }
+        layer_record.channel_info = channel_info;
+        layer_record.transparency_mask = transparency_mask;
+        layer_record.user_supplied_layer_mask = user_supplied_layer_mask;
+        layer_record.real_user_supplied_layer_mask = real_user_supplied_layer_mask;
+    }
 }
 
 fn into_layer_tree(layers: Vec<LayerRecord>) -> Vec<LayerTreeNode> {
@@ -480,44 +582,25 @@ fn into_layer_tree(layers: Vec<LayerRecord>) -> Vec<LayerTreeNode> {
         End,
     }
     for layer in layers {
-        let divider = layer
-            .additional_layer_info()
-            .iter()
-            .find_map(|info| match info {
-                AdditionalLayerInformation::SectionDivider {
-                    section_divider_type,
-                    ..
-                } => match section_divider_type {
-                    SectionDividerType::BoundingSectionDivider => {
-                        Some(SectionDividerTypeInner::Start)
-                    }
-                    SectionDividerType::OpenFolder | SectionDividerType::ClosedFolder => {
-                        Some(SectionDividerTypeInner::End)
-                    }
-                    SectionDividerType::AnyOtherType => {
-                        eprintln!("may be error");
-                        None
-                    }
-                },
-                _ => None,
-            });
+        let divider = layer.additional_layer_info().iter().find_map(|info| match info {
+            AdditionalLayerInformation::SectionDivider { section_divider_type, .. } => match section_divider_type {
+                SectionDividerType::BoundingSectionDivider => Some(SectionDividerTypeInner::Start),
+                SectionDividerType::OpenFolder | SectionDividerType::ClosedFolder => Some(SectionDividerTypeInner::End),
+                SectionDividerType::AnyOtherType => {
+                    eprintln!("may be error");
+                    None
+                }
+            },
+            _ => None,
+        });
         match divider {
             Some(SectionDividerTypeInner::Start) => stack.push(Vec::new()),
             Some(SectionDividerTypeInner::End) => {
                 let mut layers = stack.pop().expect("invalid layer structure");
                 layers.reverse();
-                stack
-                    .last_mut()
-                    .expect("invalid layer structure")
-                    .push(LayerTreeNode::Node {
-                        folder: layer,
-                        children: layers,
-                    });
+                stack.last_mut().expect("invalid layer structure").push(LayerTreeNode::Node { folder: layer, children: layers });
             }
-            None => stack
-                .last_mut()
-                .expect("invalid layer structure")
-                .push(LayerTreeNode::Leaf(layer)),
+            None => stack.last_mut().expect("invalid layer structure").push(LayerTreeNode::Leaf(layer)),
         }
     }
     let [mut list]: [_; 1] = stack.try_into().expect("invalid layer structure");
@@ -525,10 +608,7 @@ fn into_layer_tree(layers: Vec<LayerRecord>) -> Vec<LayerTreeNode> {
     list
 }
 
-fn parse_channel_image_data<'a, 'b>(
-    mut input: &'a [u8],
-    layer_records: &'b mut [LayerRecord<'a>],
-) -> IResult<&'a [u8], ()> {
+fn parse_channel_image_data<'a, 'b>(mut input: &'a [u8], layer_records: &'b mut [LayerRecord<'a>]) -> IResult<&'a [u8], ()> {
     for layer_record in layer_records {
         for channel_info in &mut layer_record.channel_info {
             let len = channel_info.channel_data_length();
@@ -567,12 +647,13 @@ fn parse_layer_record(input: &[u8]) -> IResult<&[u8], LayerRecord> {
     let (input, blend_mode) = map_res(take(4usize), BlendMode::try_from)(input)?;
     let (input, opacity) = be_u8(input)?;
     let (input, clipping) = map_res(be_u8, Clipping::try_from)(input)?;
-    let (input, flags) = be_u8(input)?;
+    let (input, flags) = map_res(be_u8, |flags| LayerRecordFlags::from_bits(flags).ok_or(flags))(input)?;
     let (input, _) = take(1usize)(input)?;
     let (input, len) = be_u32(input)?;
     let (follow, input) = take(len)(input)?;
     let (input, layer_mask_data_len) = be_u32(input)?;
     let (input, layer_mask_data) = take(layer_mask_data_len)(input)?;
+    let (_, layer_mask_data) = parse_layer_mask_data(layer_mask_data)?;
     let (input, layer_blending_ranges_len) = be_u32(input)?;
     let (input, layer_blending_ranges_data) = take(layer_blending_ranges_len)(input)?;
     let (input, layer_name_len) = be_u8(input)?;
@@ -597,15 +678,69 @@ fn parse_layer_record(input: &[u8]) -> IResult<&[u8], LayerRecord> {
             layer_bottom,
             layer_right,
             channel_info,
+            transparency_mask: None,
+            user_supplied_layer_mask: None,
+            real_user_supplied_layer_mask: None,
             blend_mode,
             opacity,
             clipping,
             flags,
-            layer_mask_data: Cow::Borrowed(layer_mask_data),
+            layer_mask_data,
             layer_blending_ranges_data: Cow::Borrowed(layer_blending_ranges_data),
             layer_name: Cow::Borrowed(layer_name),
             additional_layer_info,
         },
+    ))
+}
+
+fn parse_layer_mask_data(input: &[u8]) -> IResult<&[u8], Option<LayerMaskData>> {
+    if input.is_empty() {
+        return Ok((input, None));
+    }
+    let (input, layer_mask_top) = be_i32(input)?;
+    let (input, layer_mask_left) = be_i32(input)?;
+    let (input, layer_mask_bottom) = be_i32(input)?;
+    let (input, layer_mask_right) = be_i32(input)?;
+    let (input, default_color) = be_u8(input)?;
+    let (input, flags) = map_res(be_u8, |flags| LayerMaskFlags::from_bits(flags).ok_or(flags))(input)?;
+    if input.len() == 2 {
+        return Ok((
+            &input[..0],
+            Some(LayerMaskData {
+                layer_mask_top,
+                layer_mask_left,
+                layer_mask_bottom,
+                layer_mask_right,
+                default_color,
+                flags,
+                optional: None,
+            }),
+        ));
+    }
+    let (input, real_flags) = map_res(be_u8, |flags| LayerMaskFlags::from_bits(flags).ok_or(flags))(input)?;
+    let (input, real_user_mask_background) = be_u8(input)?;
+    let (input, mask_top) = be_i32(input)?;
+    let (input, mask_left) = be_i32(input)?;
+    let (input, mask_bottom) = be_i32(input)?;
+    let (input, mask_right) = be_i32(input)?;
+    Ok((
+        input,
+        Some(LayerMaskData {
+            layer_mask_top,
+            layer_mask_left,
+            layer_mask_bottom,
+            layer_mask_right,
+            default_color,
+            flags,
+            optional: Some(LayerMaskOptionalData {
+                real_flags,
+                real_user_mask_background,
+                layer_mask_top: mask_top,
+                layer_mask_left: mask_left,
+                layer_mask_bottom: mask_bottom,
+                layer_mask_right: mask_right,
+            }),
+        }),
     ))
 }
 
@@ -614,22 +749,12 @@ fn parse_global_layer_mask_info(input: &[u8]) -> IResult<&[u8], &[u8]> {
     take(len)(input)
 }
 
-fn parse_additional_layer_info<'a>(
-    key: &'a [u8; 4],
-    data: &'a [u8],
-) -> IResult<&'a [u8], AdditionalLayerInformation<'a>> {
+fn parse_additional_layer_info<'a>(key: &'a [u8; 4], data: &'a [u8]) -> IResult<&'a [u8], AdditionalLayerInformation<'a>> {
     match key {
         b"lsct" => {
             let (data, section_type) = map_res(be_u32, SectionDividerType::from_u32)(data)?;
             if data.is_empty() {
-                return Ok((
-                    data,
-                    AdditionalLayerInformation::SectionDivider {
-                        section_divider_type: section_type,
-                        key: None,
-                        sub_type: None,
-                    },
-                ));
+                return Ok((data, AdditionalLayerInformation::SectionDivider { section_divider_type: section_type, key: None, sub_type: None }));
             }
             let (data, _) = tag(b"8BIM")(data)?;
             let (data, blend_mode) = map_res(take(4usize), BlendMode::try_from)(data)?;
@@ -653,12 +778,6 @@ fn parse_additional_layer_info<'a>(
                 },
             ))
         }
-        _ => Ok((
-            &data[..0],
-            AdditionalLayerInformation::Unknown {
-                key: Cow::Borrowed(key),
-                data: Cow::Borrowed(data),
-            },
-        )),
+        _ => Ok((&data[..0], AdditionalLayerInformation::Unknown { key: Cow::Borrowed(key), data: Cow::Borrowed(data) })),
     }
 }
