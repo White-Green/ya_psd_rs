@@ -48,10 +48,10 @@ impl<'a> Psd<'a> {
 }
 
 pub fn parse_psd(input: &[u8]) -> Result<Psd, anyhow::Error> {
-    let (input, header) = parse_header(input).unwrap();
-    let (input, color_mode) = parse_color_mode(input, &header).unwrap();
-    let (input, image_resources) = parse_image_resources(input).unwrap();
-    let (input, layer_information) = parse_layer_and_mask_information(input).unwrap();
-    let (_, image_data) = parse_image_data(input, &header).unwrap();
+    let (input, header) = parse_header(input).map_err(|e| e.map_input(|slice| slice.to_vec()))?;
+    let (input, color_mode) = parse_color_mode(input, &header).map_err(|e| e.map_input(|slice| slice.to_vec()))?;
+    let (input, image_resources) = parse_image_resources(input).map_err(|e| e.map_input(|slice| slice.to_vec()))?;
+    let (input, layer_information) = parse_layer_and_mask_information(input).map_err(|e| e.map_input(|slice| slice.to_vec()))?;
+    let (_, image_data) = parse_image_data(input, &header).map_err(|e| e.map_input(|slice| slice.to_vec()))?;
     Ok(Psd { header, color_mode, image_resources, layer_information, image_data })
 }
